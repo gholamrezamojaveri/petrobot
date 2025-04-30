@@ -1,6 +1,9 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
-const { createCanvas } = require('canvas');
+const { createCanvas, registerFont } = require('canvas');
+const fs = require('fs');
+
+registerFont('./Vazir.ttf', { family: 'Vazir' }); // ← مسیر دقیق فونت
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 const CHANNEL_ID = process.env.CHANNEL_ID;
@@ -15,13 +18,12 @@ bot.command('setrate', async (ctx) => {
 
   const input = ctx.message.text.split(' ')[1];
   if (!input || isNaN(input)) {
-    return ctx.reply('❗ لطفاً نرخ دلار را به‌صورت عدد وارد کنید. مثال: /setrate 93000');
+    return ctx.reply('❗ لطفاً نرخ دلار را عددی وارد کنید. مثال: /setrate 93000');
   }
 
   baseRate = parseInt(input);
   ctx.reply(`✅ نرخ پایه دلار ثبت شد: ${baseRate.toLocaleString()} تومان`);
 
-  // تاریخ و زمان از تلگرام
   const msgDate = new Date(ctx.message.date * 1000);
   const timeString = msgDate.toLocaleTimeString('fa-IR');
   const dateString = msgDate.toLocaleDateString('fa-IR');
@@ -41,26 +43,28 @@ bot.command('setrate', async (ctx) => {
   const canvas = createCanvas(800, 1000);
   const ctx2 = canvas.getContext('2d');
 
-  ctx2.fillStyle = '#ffffff';
+  ctx2.fillStyle = '#fff';
   ctx2.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx2.fillStyle = '#000000';
-  ctx2.font = 'bold 30px sans-serif';
+  ctx2.fillStyle = '#000';
+  ctx2.font = 'bold 32px Vazir';
   ctx2.fillText('📊 نرخ ارز امروز', 250, 60);
-  ctx2.font = '24px sans-serif';
+  ctx2.font = '24px Vazir';
   ctx2.fillText(`📅 ${dateString} - ⏰ ${timeString}`, 180, 100);
 
-  ctx2.font = '22px sans-serif';
   let y = 160;
+  ctx2.font = '22px Vazir';
+
   for (const [label, value] of Object.entries(rates)) {
     ctx2.fillText(`${label}: ${value.toLocaleString()} تومان`, 80, y);
     y += 40;
   }
 
-  ctx2.font = '20px sans-serif';
-  ctx2.fillText('📎 PetroBot | @dreamofroseMENA', 200, 950);
+  ctx2.font = '20px Vazir';
+  ctx2.fillText('📎 PetroBot | کانال رسمی', 200, 950);
 
   const buffer = canvas.toBuffer('image/png');
+  fs.writeFileSync('exchange.png', buffer);
 
   try {
     await ctx.telegram.sendPhoto(CHANNEL_ID, {
