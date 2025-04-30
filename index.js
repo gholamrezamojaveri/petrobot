@@ -1,88 +1,79 @@
-const { Telegraf } = require('telegraf');
-const axios = require('axios');
-const fs = require('fs');
-const { createCanvas, loadImage, registerFont } = require('canvas');
 require('dotenv').config();
+const { Telegraf } = require('telegraf');
+const { createCanvas } = require('canvas');
+const fs = require('fs');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
+const CHANNEL_ID = process.env.CHANNEL_ID;
+const OWNER_ID = process.env.OWNER_ID;
 
 let baseRate = null;
 
-bot.start((ctx) => {
-  ctx.reply('سلام! این ربات برای مدیریت نرخ ارز طراحی شده است.');
-});
-
 bot.command('setrate', async (ctx) => {
+  if (ctx.from.id.toString() !== OWNER_ID) {
+    return ctx.reply('⛔ شما مجاز نیستید.');
+  }
+
   const input = ctx.message.text.split(' ')[1];
-  const userId = ctx.message.from.id.toString();
-
-  if (userId !== process.env.OWNER_ID) {
-    ctx.reply('شما مجاز به استفاده از این دستور نیستید.');
-    return;
+  if (!input || isNaN(input)) {
+    return ctx.reply('❗ لطفاً نرخ دلار را عددی وارد کنید. مثال: /setrate 93000');
   }
 
-  if (!input || isNaN(Number(input))) {
-    ctx.reply('لطفاً یک عدد معتبر وارد کنید.');
-    return;
-  }
-
-  baseRate = Number(input);
+  baseRate = parseInt(input);
   ctx.reply(`✅ نرخ پایه دلار ثبت شد: ${baseRate.toLocaleString()} تومان`);
 
+  // گرفتن تاریخ و زمان از تلگرام
+  const msgDate = new Date(ctx.message.date * 1000);
+  const timeString = msgDate.toLocaleTimeString('fa-IR');
+  const dateString = msgDate.toLocaleDateString('fa-IR');
+
+  const rates = {
+    "🇺🇸 دلار": baseRate,
+    "🇪🇺 یورو": Math.round(baseRate * 1.1),
+    "🇬🇧 پوند": Math.round(baseRate * 1.31),
+    "🇦🇪 درهم": Math.round(baseRate * 0.27),
+    "🇹🇷 لیر": Math.round(baseRate * 0.032),
+    "🇨🇳 یوان": Math.round(baseRate * 0.14),
+    "🇦🇺 دلار استرالیا": Math.round(baseRate * 0.66),
+    "🇨🇦 دلار کانادا": Math.round(baseRate * 0.75),
+    "🪙 بیت‌کوین": 6203100000000
+  };
+
+  const canvas = createCanvas(800, 1000);
+  const ctx2 = canvas.getContext('2d');
+
+  ctx2.fillStyle = '#fff';
+  ctx2.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx2.fillStyle = '#000';
+  ctx2.font = 'bold 30px sans-serif';
+  ctx2.fillText('📊 نرخ ارز امروز', 250, 60);
+  ctx2.font = '24px sans-serif';
+  ctx2.fillText(`📅 ${dateString} - ⏰ ${timeString}`, 180, 100);
+
+  let y = 160;
+  ctx2.font = '22px sans-serif';
+
+  for (const [label, value] of Object.entries(rates)) {
+    ctx2.fillText(`${label}: ${value.toLocaleString()} تومان`, 80, y);
+    y += 40;
+  }
+
+  ctx2.font = '20px sans-serif';
+  ctx2.fillText('📎 PetroBot | @dreamofroseMENA', 200, 950);
+
+  const buffer = canvas.toBuffer('image/png');
+  fs.writeFileSync('exchange.png', buffer);
+
   try {
-    const timeRes = await axios.get('https://time.ir', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
-    });
-
-    const dateMatch = timeRes.data.match(/<span id="ctl00_cphTopRight_ucMiniToday_lblShamsiDate"[^>]*>(.*?)<\/span>/);
-    const shamsiDate = dateMatch ? dateMatch[1].trim() : 'تاریخ نامشخص';
-
-    const canvas = createCanvas(800, 1000);
-    const ctx2 = canvas.getContext('2d');
-
-    registerFont('fonts/Vazir-Bold.ttf', { family: 'Vazir' });
-
-    ctx2.fillStyle = '#fff';
-    ctx2.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx2.fillStyle = '#000';
-    ctx2.font = 'bold 36px Vazir';
-    ctx2.fillText('📊 نرخ ارز امروز', 280, 70);
-
-    ctx2.font = '28px Vazir';
-    ctx2.fillText(`📅 ${shamsiDate}`, 280, 120);
-
-    const rates = [
-      { name: 'دلار 🇺🇸', value: baseRate },
-      { name: 'یورو 🇪🇺', value: 'نامشخص' },
-      { name: 'پوند 🇬🇧', value: 'نامشخص' },
-      { name: 'درهم امارات 🇦🇪', value: 'نامشخص' },
-      { name: 'لیر ترکیه 🇹🇷', value: 'نامشخص' },
-      { name: 'یوان چین 🇨🇳', value: 'نامشخص' },
-      { name: 'دلار استرالیا 🇦🇺', value: 'نامشخص' },
-      { name: 'دلار کانادا 🇨🇦', value: 'نامشخص' },
-      { name: 'بیت‌کوین ⚫', value: '6,203,100,000,000' }
-    ];
-
-    rates.forEach((item, i) => {
-      ctx2.fillText(`${item.name}: ${item.value} تومان`, 100, 200 + i * 60);
-    });
-
-    ctx2.fillText('📤 ارسال شده با ربات مدیریتی PetroBot', 180, 900);
-
-    const buffer = canvas.toBuffer('image/png');
-    fs.writeFileSync('exchange.png', buffer);
-
-    await bot.telegram.sendPhoto(process.env.CHANNEL_ID, {
+    await ctx.telegram.sendPhoto(CHANNEL_ID, {
       source: buffer
     }, {
-      caption: '📌 نرخ روز ارز توسط ربات PetroBot'
+      caption: '📡 نرخ روز با تاریخ دقیق - ارسال شده توسط PetroBot'
     });
   } catch (err) {
     console.error(err);
-    ctx.reply('❌ خطا در دریافت اطلاعات یا ارسال تصویر.');
+    ctx.reply(`❌ خطا در ارسال: ${err.message}`);
   }
 });
 
