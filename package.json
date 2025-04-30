@@ -1,12 +1,14 @@
 {
-  "name": "petrobot",
+  "name": "petrobot-final",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "telegraf": "^4.12.2",
-    "dotenv": "^16.3.1"
+    "axios": "^1.6.7",
+    "canvas": "^2.11.2",
+    "dotenv": "^16.3.1",
+    "telegraf": "^4.12.2"
   }
 }
