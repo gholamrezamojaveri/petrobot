@@ -20,7 +20,7 @@ bot.command('setrate', async (ctx) => {
 
   try {
     const timeRes = await axios.get('https://time.ir/');
-    const dateMatch = timeRes.data.match(/<span id="ctl00_cphTopRight_ucMiniToday_lblShamsiDate"[^>]*>(.*?)<\\/span>/);
+    const dateMatch = timeRes.data.match(/<span id="ctl00_cphTopRight_ucMiniToday_lblShamsiDate"[^>]*>(.*?)<\/span>/);
     const dateText = dateMatch ? dateMatch[1] : 'تاریخ نامشخص';
 
     const rates = {
