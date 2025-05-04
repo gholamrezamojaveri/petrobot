@@ -1,8 +1,8 @@
 require('dotenv').config();
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
-const { createCanvas, registerFont, loadImage } = require('canvas');
 const fs = require('fs');
+const { createCanvas, registerFont, loadImage } = require('canvas');
 
 registerFont('./Vazir.ttf', { family: 'Vazir' });
 
@@ -10,49 +10,38 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 const CHANNEL_ID = process.env.CHANNEL_ID;
 const OWNER_ID = process.env.OWNER_ID;
 
-let baseRate = null; // نرخ پایه دلار به تومان
+let baseRate = null;
 
 bot.command('setrate', async (ctx) => {
   if (ctx.from.id.toString() !== OWNER_ID) {
-    return ctx.reply('⛔ فقط مدیر مجاز به وارد کردن نرخ پایه است.');
+    return ctx.reply('⛔ فقط مدیر ربات می‌تواند نرخ پایه را وارد کند.');
   }
 
   const input = ctx.message.text.split(' ')[1];
   if (!input || isNaN(input)) {
-    return ctx.reply('❗ لطفاً نرخ پایه دلار را به‌صورت عدد وارد کنید. مثال: /setrate 86500');
+    return ctx.reply('❗ لطفاً نرخ دلار را به‌صورت عددی وارد کنید. مثال: /setrate 86500');
   }
 
   baseRate = parseInt(input);
   await ctx.reply(`✅ نرخ پایه دلار ثبت شد: ${baseRate.toLocaleString()} تومان`);
-  await generateAndSendImage(ctx);
+  await generateImageAndSend(ctx);
 });
 
-async function generateAndSendImage(ctx) {
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('fa-IR');
-  const dateStr = now.toLocaleDateString('fa-IR');
-
+async function generateImageAndSend(ctx) {
   try {
-    // نرخ‌های جهانی بر حسب USD (از xe.com یا ثابت)
-    const globalRates = {
-      "EUR": 1.13015,
-      "AED": 3.6725,
-      "GBP": 1.31,
-      "TRY": 0.032,
-      "CNY": 0.14,
-      "AUD": 0.66,
-      "CAD": 0.75,
-      "USDT": 1.0
+    // نرخ جهانی ارزها به دلار (از xe.com دستی به‌روز شده)
+    const rates = {
+      "یورو": 1.13015,
+      "پوند": 1.31,
+      "درهم": 3.6725,
+      "لیر": 0.032,
+      "یوان": 0.14,
+      "دلار استرالیا": 0.66,
+      "دلار کانادا": 0.75,
+      "تتر": 1.0
     };
 
-    // محاسبه نرخ به تومان
-    const computedRates = {};
-    for (const [symbol, usdRate] of Object.entries(globalRates)) {
-      computedRates[symbol] = Math.round(usdRate * baseRate);
-    }
-
-    // نرخ فرضی طلا و سکه (می‌توان به منابع زنده وصل کرد)
-    const goldRates = {
+    const gold = {
       "انس طلا": "3,241",
       "طلای ۱۸ عیار": "6,798,000",
       "مثقال طلا": "29,480,000",
@@ -62,58 +51,58 @@ async function generateAndSendImage(ctx) {
       "سکه گرمی": "13,800,000"
     };
 
+    const now = new Date();
+    const time = now.toLocaleTimeString('fa-IR');
+    const date = now.toLocaleDateString('fa-IR');
+
     const canvas = createCanvas(1080, 1080);
-    const ctx2 = canvas.getContext('2d');
+    const c = canvas.getContext('2d');
 
-    // پس‌زمینه سفید
-    ctx2.fillStyle = '#fff';
-    ctx2.fillRect(0, 0, canvas.width, canvas.height);
+    c.fillStyle = '#f5f5f5';
+    c.fillRect(0, 0, canvas.width, canvas.height);
 
-    // عنوان ستون‌ها
-    ctx2.fillStyle = '#000';
-    ctx2.font = 'bold 36px Vazir';
-    ctx2.fillText('📊 نرخ ارز', 100, 80);
-    ctx2.fillText('📊 نرخ طلا و سکه', 650, 80);
+    c.font = 'bold 36px Vazir';
+    c.fillStyle = '#000';
+    c.fillText('نرخ ارز', 120, 80);
+    c.fillText('نرخ طلا و سکه', 650, 80);
 
-    // ارزها
-    ctx2.font = '28px Vazir';
-    let y1 = 150;
-    for (const [symbol, irr] of Object.entries(computedRates)) {
-      ctx2.fillText(`${symbol}: ${irr.toLocaleString()} تومان`, 100, y1);
-      y1 += 45;
+    c.font = '28px Vazir';
+    let y = 150;
+    for (const [key, value] of Object.entries(rates)) {
+      const toman = Math.round(value * baseRate).toLocaleString();
+      c.fillText(`${key}: ${toman} تومان`, 100, y);
+      y += 45;
     }
 
-    // طلا و سکه
-    let y2 = 150;
-    for (const [label, val] of Object.entries(goldRates)) {
-      ctx2.fillText(`${label}: ${val} تومان`, 650, y2);
-      y2 += 45;
+    y = 150;
+    for (const [key, value] of Object.entries(gold)) {
+      c.fillText(`${key}: ${value} تومان`, 650, y);
+      y += 45;
     }
 
-    // تاریخ و ساعت
-    ctx2.font = '24px Vazir';
-    ctx2.fillText(`📅 ${dateStr}   ⏰ ${timeStr}`, 360, 960);
+    // زمان و تاریخ
+    c.font = '24px Vazir';
+    c.fillStyle = '#333';
+    c.fillText(`📅 ${date}   ⏰ ${time}`, 360, 950);
 
     // لوگو
     try {
       const logo = await loadImage('./logo.png');
-      ctx2.drawImage(logo, 900, 20, 150, 60);
+      c.drawImage(logo, 900, 30, 150, 60);
     } catch (e) {
-      console.warn('⚠️ لوگو بارگذاری نشد:', e.message);
+      console.warn('لوگو بارگذاری نشد:', e.message);
     }
 
-    // امضا
-    ctx2.font = '20px Vazir';
-    ctx2.fillStyle = '#666';
-    ctx2.fillText('📎 تهیه شده توسط PetroBot | @moneypetro', 280, 1000);
+    c.font = '20px Vazir';
+    c.fillStyle = '#777';
+    c.fillText('📎 PetroBot | @moneypetro', 350, 1000);
 
     const buffer = canvas.toBuffer('image/png');
     fs.writeFileSync('final.png', buffer);
 
     await ctx.telegram.sendPhoto(CHANNEL_ID, { source: buffer }, {
-      caption: '📡 نرخ رسمی ارز و طلا - با محاسبه خودکار بر اساس دلار پایه'
+      caption: '📡 نرخ رسمی ارز و طلا بر اساس دلار پایه'
     });
-
   } catch (err) {
     console.error(err);
     ctx.reply(`❌ خطا در ایجاد یا ارسال تصویر: ${err.message}`);
